@@ -1,18 +1,12 @@
-## ============================================================================
 ## Phase 5 simulation study
 ##
-## Part A: sweep the censoring horizon tau_c from severely insufficient to
-##         close-to-sufficient follow-up, and show naive Beran bias vs
-##         EBVK-corrected estimator bias as a function of insufficiency.
-##         (Uses the from-scratch estimator validated in Phase 2 -- all
+## Part A: sweep the censoring horizon tau_c from severely insufficient to close-to-sufficient follow-up, and show naive Beran bias vs
+##         EBVK-corrected estimator bias as a function of insufficiency. (Uses the from-scratch estimator validated in Phase 2 -- all
 ##         functions are reproduced here so this script is self-contained.)
 ##
 ## Part B: Method 1 (intersection-union test) vs Method 2 (bootstrap
-##         worst-category selection) from Yuen/Musta/Van Keilegom's
-##         categorical-covariate SFU test, as the number of covariate
-##         categories K grows with a FIXED total sample size (so per-category
-##         n shrinks as K grows -- mirrors the real-data sex-stratification
-##         noise we saw in Phase 2).
+##         worst-category selection) from Yuen/Musta/Van Keilegom's categorical-covariate SFU test, as the number of covariate
+##         categories K grows with a FIXED total sample size (so per-category n shrinks as K grows -- mirrors the real-data sex-stratification noise we saw in Phase 2).
 ##           - Level (Type-I error) of Method 1 under a scenario where every
 ##             category truly has sufficient follow-up.
 ##           - Power of Method 1 to detect that at least one category has
@@ -20,12 +14,7 @@
 ##           - Selection accuracy of Method 2's x.ast.hat: how often it
 ##             correctly identifies the true worst category.
 ##
-## Tune N_REPS / N_BOOT down for a quick smoke test, up for tighter Monte
-## Carlo error. Defaults below aim for a runtime of roughly 30-60 minutes on
-## a laptop; if that's too slow, halve N_REPS first (cheapest lever).
-## ============================================================================
 
-## ---- setup ------------------------------------------------------------
 need <- c("KernSmooth", "survival")
 for (p in need) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
 if (!requireNamespace("cureSFUTest", quietly = TRUE)) {
@@ -40,11 +29,9 @@ suppressMessages({
 
 set.seed(20260807)
 
-## ============================================================================
-## PART A: tau_c sweep for the from-scratch EBVK extrapolation estimator
-## ============================================================================
 
-## ---- Beran estimator + EBVK eqs (2.6)-(2.8), as validated in Phase 2 ----
+## PART A: tau_c sweep for the from-scratch EBVK extrapolation estimator
+
 epan <- function(u) ifelse(abs(u) < 1, 0.75 * (1 - u^2), 0)
 
 make_beran <- function(T, delta, X, x0, h) {
@@ -98,7 +85,7 @@ fit_one <- function(Tobs, delta, X, x0, h) {
   c(beran = beran_p, corrected = pmat[best[1], best[2]])
 }
 
-## ---- synthetic cure-model generator (same setup validated in Phase 2) ----
+
 gamma_fun <- function(x) (x + 1) / 2
 p_fun <- function(x, b1 = 0.4, b2 = 2) {
   lp <- b1 + b2 * (2 * x - 1)
@@ -117,8 +104,8 @@ simulate_one <- function(n, tau_c, eps_fixed_frac = 0.1) {
   list(Tobs = Tobs, delta = delta, X = X)
 }
 
-## ---- run the sweep ----
-N_REPS_A <- 30          # reduce to ~10 for a quick smoke test
+
+N_REPS_A <- 30         
 TAU_C_GRID <- c(4, 6, 8, 12, 20, 40)
 N_A <- 2000
 X0_A <- 0.5
@@ -148,7 +135,6 @@ partA_results <- do.call(rbind, lapply(TAU_C_GRID, function(tau_c) {
 cat("\n=== Part A results: bias/MSE vs tau_c (severity of insufficient follow-up) ===\n")
 print(partA_results, row.names = FALSE)
 
-## simple base-R plot: bias vs tau_c for both estimators
 png("/mnt/user-data/outputs/partA_bias_vs_tauc.png", width = 800, height = 600)
 plot(partA_results$tau_c, partA_results$bias_beran, type = "b", col = "firebrick",
      ylim = range(c(partA_results$bias_beran, partA_results$bias_corrected), na.rm = TRUE),
@@ -163,20 +149,13 @@ cat("saved plot: partA_bias_vs_tauc.png\n")
 
 saveRDS(partA_results, "/mnt/user-data/outputs/partA_results.rds")
 
-
-## ============================================================================
 ## PART B: Method 1 (IUT) vs Method 2 (bootstrap x* selection) as K grows
-## ============================================================================
 
-## synthetic categorical-covariate cure data: K categories, fixed total n
-## split evenly. Category 1 is deliberately the "hard" one; categories 2..K
-## are comfortably sufficient. A second scenario makes ALL categories
-## sufficient (for the level/Type-I-error check).
 simulate_categorical <- function(K, n_total, hard_tau_c, easy_tau_c,
                                   all_sufficient = FALSE) {
   n_per <- floor(n_total / K)
-  gam <- 0.9          # fixed shape, keep it simple: same tail across categories
-  p_true <- 0.55       # fixed cure probability across categories
+  gam <- 0.9         
+  p_true <- 0.55      
   Y_list <- list(); C_list <- list(); X_list <- list()
   for (k in seq_len(K)) {
     tau_c_k <- if (all_sufficient || k != 1) easy_tau_c else hard_tau_c
@@ -192,17 +171,17 @@ simulate_categorical <- function(K, n_total, hard_tau_c, easy_tau_c,
   list(Tobs = Tobs, delta = delta, X = X)
 }
 
-N_REPS_B <- 30           # reduce to ~10 for a quick smoke test
-N_BOOT_B <- 200          # reduce to ~100 for speed, increase for precision
+N_REPS_B <- 30          
+N_BOOT_B <- 200         
 K_GRID <- 2:5
-N_TOTAL_B <- 400         # fixed total n, split evenly across K categories
-HARD_TAU_C <- 3          # short horizon -> category 1 insufficient
-EASY_TAU_C <- 30         # long horizon -> comfortably sufficient
-TAU_TEST_B <- 60         # test tau, must exceed max(Tobs) always
+N_TOTAL_B <- 400         
+HARD_TAU_C <- 3          
+EASY_TAU_C <- 30        
+TAU_TEST_B <- 60       
 
 run_scenario <- function(K, all_sufficient) {
-  method1_reject <- logical(N_REPS_B)   # TRUE = "sufficient for all x" concluded
-  method2_correct <- logical(N_REPS_B)  # only meaningful when !all_sufficient
+  method1_reject <- logical(N_REPS_B)   
+  method2_correct <- logical(N_REPS_B) 
   for (r in seq_len(N_REPS_B)) {
     set.seed(1000 * K + r + (if (all_sufficient) 500000 else 0))
     dat <- simulate_categorical(K, N_TOTAL_B, HARD_TAU_C, EASY_TAU_C, all_sufficient)
@@ -214,8 +193,7 @@ run_scenario <- function(K, all_sufficient) {
     agg_p <- max(res$p.value)
     method1_reject[r] <- agg_p < 0.05   # reject H0 -> conclude sufficient for ALL x
     if (!all_sufficient) {
-      # true worst category is category 1 (x.unique is sorted, so index 1
-      # corresponds to X value 1, i.e. category 1)
+    
       method2_correct[r] <- (res$x.ast.hat == which(res$x.unique == 1))
     }
   }
@@ -232,21 +210,11 @@ partB_results <- do.call(rbind, lapply(K_GRID, function(K) {
   data.frame(
     K = K,
     n_per_category = floor(N_TOTAL_B / K),
-    # Power to confirm true full sufficiency: scen_null is the "all
-    # categories sufficient" generative scenario, where the ground truth is
-    # H1. Correctly detecting it means method1_reject == TRUE (IUT rejects
-    # H0 and concludes "sufficient for all"), so power is the *direct*
-    # rejection rate here, not its complement. Expect this to fall as K
-    # grows, since all K per-category tests must clear 5% simultaneously.
+    
     method1_power = mean(scen_null$method1_reject, na.rm = TRUE),
-    # Type I error (false "all clear"): scen_alt is the "one category
-    # insufficient" generative scenario, where the ground truth is H0.
-    # Wrongly concluding "sufficient for all" means method1_reject == TRUE,
-    # so this is also the *direct* rejection rate, not its complement.
-    # Expect this to stay at or near 0 (IUTs are conservative).
+    
     method1_type1_error = mean(scen_alt$method1_reject, na.rm = TRUE),
-    # Method 2 selection accuracy: how often x.ast.hat correctly flags the
-    # true worst category
+   
     method2_selection_accuracy = mean(scen_alt$method2_correct, na.rm = TRUE)
   )
 }))
