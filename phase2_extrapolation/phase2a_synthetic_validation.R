@@ -1,11 +1,5 @@
-## ============================================================================
 ## Phase 2a: synthetic sanity check of the from-scratch EBVK extrapolation
 ## estimator against known ground truth (report Sec. 5.2).
-##
-## True DGP: gamma(x) = (x+1)/2 (linear tail index), logistic cure
-## probability p(x), Pareto-tailed uncured survival times, artificially
-## short follow-up window to force genuine insufficient-follow-up bias.
-## ============================================================================
 
 source(if (file.exists("R/beran_ebvk.R")) "R/beran_ebvk.R" else "../R/beran_ebvk.R")
 if (!requireNamespace("KernSmooth", quietly = TRUE)) install.packages("KernSmooth")
@@ -13,17 +7,13 @@ suppressMessages(library(KernSmooth))
 
 set.seed(2026)
 
-## ---- ground truth ----
+
 gamma_fun <- function(x) (x + 1) / 2
 p_fun <- function(x, b1 = 0.4, b2 = 2) {
   lp <- b1 + b2 * (2 * x - 1)
   exp(lp) / (1 + exp(lp))
 }
 
-## ---- synthetic cure-model generator ----
-## eps_fixed_frac of subjects are censored exactly at tau_c (administrative
-## censoring); the rest are censored uniformly on [0, tau_c] -- this is what
-## forces an artificially short follow-up window relative to the Pareto tail.
 simulate_one <- function(n, tau_c, eps_fixed_frac = 0.1) {
   X <- runif(n, 0, 1)
   gam_i <- gamma_fun(X); p_i <- p_fun(X)
@@ -36,16 +26,14 @@ simulate_one <- function(n, tau_c, eps_fixed_frac = 0.1) {
   list(Tobs = Tobs, delta = delta, X = X)
 }
 
-## ============================================================================
 ## Single-run sanity check at x0 = 0.5
-## ============================================================================
 x0 <- 0.5
 true_gamma <- gamma_fun(x0)
 true_p <- p_fun(x0)
 cat(sprintf("Ground truth at x0=%.1f: gamma=%.4f, p=%.4f\n", x0, true_gamma, true_p))
 
 n <- 2000
-tau_c_short <- 6   # short synthetic follow-up, forces insufficiency
+tau_c_short <- 6 
 dat <- simulate_one(n, tau_c_short)
 h <- dpik(dat$X)
 fit <- fit_one(dat$Tobs, dat$delta, dat$X, x0, h)
@@ -55,9 +43,7 @@ cat(sprintf("EBVK corrected p_hat = %.4f (gamma_hat = %.4f)\n", fit$corrected, f
 cat(sprintf("Corrected moves toward truth: %s\n",
             abs(fit$corrected - true_p) < abs(fit$beran - true_p)))
 
-## ============================================================================
 ## Repeated-sample check: bias/MSE of naive vs corrected over R reps
-## ============================================================================
 R <- 20
 reps <- t(sapply(seq_len(R), function(r) {
   d <- simulate_one(n, tau_c_short)
