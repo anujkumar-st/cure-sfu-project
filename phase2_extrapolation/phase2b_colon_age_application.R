@@ -1,9 +1,6 @@
-## ============================================================================
 ## Phase 2b: apply the validated EBVK extrapolation estimator to real
 ## survival::colon data, age as the (single) covariate, 9-point grid over
-## ages 35-75. Reproduces report Sec. 5.3: naive vs corrected cure-rate
-## curves for recurrence and death, plus a sex-stratified replication check.
-## ============================================================================
+## ages 35-75.
 
 source(if (file.exists("R/beran_ebvk.R")) "R/beran_ebvk.R" else "../R/beran_ebvk.R")
 need <- c("survival", "KernSmooth")
@@ -18,7 +15,7 @@ death$time_yr <- death$time / 365.25
 
 age_grid <- seq(35, 75, length.out = 9)
 
-## ---- pooled (unstratified) age-grid application, both endpoints ----
+
 run_grid <- function(dat, grid) {
   h <- dpik(dat$age)
   out <- t(sapply(grid, function(x0) {
@@ -44,9 +41,8 @@ cat(sprintf("\nCorrected >= naive everywhere (recurrence): %s\n",
 cat(sprintf("Corrected >= naive everywhere (death):      %s\n",
             all(death_curve$gap >= -1e-8, na.rm = TRUE)))
 
-## ============================================================================
+
 ## Sex-stratified check against Phase 1's recurrence x sex finding
-## ============================================================================
 cat("\n=== Sex-stratified recurrence age-grid (check against Phase 1) ===\n")
 rec_male   <- rec[rec$sex == 1, ]
 rec_female <- rec[rec$sex == 0, ]
