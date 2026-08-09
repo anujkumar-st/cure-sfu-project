@@ -1,19 +1,12 @@
 ## Phase 5 simulation study
-##
-## Part A: sweep the censoring horizon tau_c from severely insufficient to close-to-sufficient follow-up, and show naive Beran bias vs
-##         EBVK-corrected estimator bias as a function of insufficiency. (Uses the from-scratch estimator validated in Phase 2 -- all
+## Part A: sweep the censoring horizon tau_c from severely insufficient to close-to-sufficient follow-up, and show the naive Beran bias vs. the  EBVK-corrected estimator bias as a function of insufficiency. (Uses the from-scratch estimator validated in Phase 2 -- all
 ##         functions are reproduced here so this script is self-contained.)
-##
-## Part B: Method 1 (intersection-union test) vs Method 2 (bootstrap
-##         worst-category selection) from Yuen/Musta/Van Keilegom's categorical-covariate SFU test, as the number of covariate
-##         categories K grows with a FIXED total sample size (so per-category n shrinks as K grows -- mirrors the real-data sex-stratification noise we saw in Phase 2).
-##           - Level (Type-I error) of Method 1 under a scenario where every
-##             category truly has sufficient follow-up.
-##           - Power of Method 1 to detect that at least one category has
-##             insufficient follow-up.
-##           - Selection accuracy of Method 2's x.ast.hat: how often it
-##             correctly identifies the true worst category.
-##
+
+## Part B: Method 1 (intersection-union test) vs Method 2 (bootstrap worst-category selection) from Yuen/Musta/Van Keilegom's categorical-covariate SFU test, as the number of covariate
+##         categories K grows with a FIXED total sample size (so per-category n shrinks as K grows—mirroring the real-data sex-stratification noise we saw in Phase 2).
+##           - Level (Type-I error) of Method 1 under a scenario where every category truly has sufficient follow-up.
+##           - Power of Method 1 to detect that at least one category has insufficient follow-up.
+##           - Selection accuracy of Method 2's x.ast.hat: how often it correctly identifies the true worst category.
 
 need <- c("KernSmooth", "survival")
 for (p in need) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
@@ -191,7 +184,7 @@ run_scenario <- function(K, all_sufficient) {
       error = function(e) NULL)
     if (is.null(res)) { method1_reject[r] <- NA; method2_correct[r] <- NA; next }
     agg_p <- max(res$p.value)
-    method1_reject[r] <- agg_p < 0.05   # reject H0 -> conclude sufficient for ALL x
+    method1_reject[r] <- agg_p < 0.05  
     if (!all_sufficient) {
     
       method2_correct[r] <- (res$x.ast.hat == which(res$x.unique == 1))
