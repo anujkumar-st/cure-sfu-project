@@ -1,14 +1,10 @@
-## ============================================================================
 ## Phase 2d: companion curse-of-dimensionality analysis on the DEATH
 ## endpoint (report Sec. 5.4, paragraph after Table 3), with a different
 ## covariate order (age, +nodes, +sex, +differ) and checked across FIVE
 ## evaluation points instead of just the median patient, to test whether
 ## the single-point "gap shrinks monotonically with dimension" story
 ## generalizes.
-##
-## Points: the median patient, plus a young/old age x low/high nodes grid
-## (nodes=8 is a deliberately rare value -- typical patients have 1-5).
-## ============================================================================
+
 
 source(if (file.exists("R/beran_ebvk.R")) "R/beran_ebvk.R" else "../R/beran_ebvk.R")
 need <- c("survival", "KernSmooth")
@@ -22,15 +18,15 @@ death$time_yr <- death$time / 365.25
 tau_n <- max(death$time_yr)
 cat(sprintf("n = %d\n", nrow(death)))
 
-## ---- fixed per-dimension bandwidths (same rule as Phase 2c) ----
+
 silverman <- function(x) 1.06 * sd(x) * length(x)^(-1 / 5)
 hvec <- c(age    = dpik(death$age),
-          nodes  = silverman(death$nodes),   # dpik degenerates for rare/high nodes values (e.g. nodes=8); Silverman avoids near-zero-weight collapse
-          sex    = 0.15,                 # Aitchison-Aitken discount, binary
+          nodes  = silverman(death$nodes),   
+          sex    = 0.15,              
           differ = silverman(death$differ))
 cat("Fixed bandwidths:\n"); print(hvec)
 
-## ---- 5 evaluation points: median patient + young/old age x low/high nodes ----
+
 med_sex <- median(death$sex); med_differ <- median(death$differ)
 points <- list(
   median_patient  = list(age = median(death$age), nodes = median(death$nodes),
