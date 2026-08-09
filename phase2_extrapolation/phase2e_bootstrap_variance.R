@@ -1,13 +1,8 @@
-## ============================================================================
 ## Phase 2e: bootstrap variance check (report Sec. 5.4, final paragraph).
-##
-## B bootstrap resamples of gamma_hat/p_hat at 3 representative points
-## (median patient, young/high-nodes, old/high-nodes) x 4 covariate
-## dimensions (age, +nodes, +sex, +differ; death endpoint, n=888), to
-## distinguish genuine dimensionality-driven instability (typical patient)
-## from pre-existing small-sample fragility (atypical/rare covariate
+## B bootstrap resamples of gamma_hat/p_hat at 3 representative points (median patient, young/high-nodes, old/high-nodes) x 4 covariate
+## dimensions (age, +nodes, +sex, +differ; death endpoint, n=888), to distinguish genuine dimensionality-driven instability (typical patient) from pre-existing small-sample fragility (atypical/rare covariate
 ## profiles) -- rather than trusting a single-sample point estimate.
-## ============================================================================
+
 
 source(if (file.exists("R/beran_ebvk.R")) "R/beran_ebvk.R" else "../R/beran_ebvk.R")
 need <- c("survival", "KernSmooth")
