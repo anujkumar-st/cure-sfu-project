@@ -1,14 +1,9 @@
-## ============================================================================
 ## Phase 2f: gbex comparison under matched conditions (report Sec. 5.5).
 ##
-## gbex (Velthoen et al. 2021) has no notion of censoring, so it can only
-## be fit on uncensored exceedances above a threshold. At the death
-## endpoint's 50th-percentile threshold there are exactly 33 uncensored
-## exceedances -- matched to the same evaluation points / covariate
-## dimensions (d1-d4: age, +nodes, +sex, +differ) used for the Beran
-## comparison in Phase 2d, to test whether gbex resolves the
+## gbex (Velthoen et al. 2021) has no notion of censoring, so it can only be fit on uncensored exceedances above a threshold. At the death
+## endpoint's 50th-percentile threshold there are exactly 33 uncensored exceedances -- matched to the same evaluation points / covariate
+## dimensions (d1-d4: age, +nodes, +sex, +differ) used for the Beran comparison in Phase 2d, to test whether gbex resolves the
 ## dimensionality-driven failure mode found there.
-## ============================================================================
 
 need <- c("survival")
 for (p in need) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
@@ -27,7 +22,7 @@ u <- quantile(death$time_yr, 0.5)
 exc <- death[death$status == 1 & death$time_yr > u, ]
 cat(sprintf("Threshold u (50th pct) = %.3f years, n uncensored exceedances = %d\n",
             u, nrow(exc)))
-excess <- exc$time_yr - u   # gbex has no built-in peaks-over-threshold step
+excess <- exc$time_yr - u  
 
 med_sex <- median(death$sex); med_differ <- median(death$differ)
 points <- list(
@@ -40,7 +35,7 @@ combos <- list(c("age"), c("age", "nodes"), c("age", "nodes", "sex"),
                c("age", "nodes", "sex", "differ"))
 
 fit_gbex_at <- function(combo, x0) {
-  Xdf <- as.data.frame(exc[, combo, drop = FALSE])   # real data.frame, real column names
+  Xdf <- as.data.frame(exc[, combo, drop = FALSE])   
   fit <- gbex(y = excess, X = Xdf, silent = TRUE)
   newdata <- as.data.frame(x0[combo])
   names(newdata) <- combo
@@ -60,7 +55,6 @@ results <- do.call(rbind, lapply(names(points), function(pname) {
 }))
 print(results, row.names = FALSE, digits = 4)
 
-## ---- root cause: check the unconditional first-guess gamma ----
 cat("\n=== Root cause: gbex's internal unconditional MLE first-guess ===\n")
 if (!requireNamespace("POT", quietly = TRUE)) install.packages("POT")
 uncond_fit <- POT::fitgpd(excess, threshold = 0)
@@ -69,7 +63,7 @@ cat(sprintf("Unconditional GPD MLE on the 33 exceedances: gamma_hat = %.5f\n",
 cat("If negative, gbex::first_guess() silently falls back to a fixed\n")
 cat("default initial gamma of 0.01, from which boosting shrinkage is tiny.\n")
 
-## ---- 30-rep bootstrap: is the flat estimate genuine stability or a frozen init? ----
+
 cat("\n=== 30-rep bootstrap of gamma_hat at age (d=1), evaluated at median age ===\n")
 set.seed(2026)
 B <- 30
