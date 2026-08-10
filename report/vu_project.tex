@@ -1,0 +1,720 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{caption}
+
+\hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
+
+\title{Testing and Correcting for Insufficient Follow-Up\\
+in Covariate-Dependent Cure Models:\\
+\large From Categorical Tests to a Heavy-Tailed Extrapolation, and Back}
+\author{Anuj Kumar}
+\date{August 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Cure models are widely used to analyze time-to-event data in which a subpopulation
+never experiences the event of interest: for example, cancer patients who are
+effectively cured, or borrowers who will never default. A central practical
+difficulty in fitting these models is \emph{insufficient follow-up}: if the observation
+window is too short relative to the tail of the event-time distribution, the cured
+fraction is systematically overestimated, because patients who would eventually
+experience the event but have not yet done so are indistinguishable, within the
+observed window, from those who are truly cured. Extreme value theory (EVT) offers
+a principled way to relax the traditional ``sufficient follow-up'' assumption by
+modeling the tail of the susceptible population's survival distribution directly.
+This report documents an applied project built around four recent papers on this
+problem, combining (i) a statistical test for whether follow-up is long enough,
+(ii) an EVT-based correction to the cure-rate estimator when it is not, and
+(iii) an investigation of how both tools behave as the number of covariates grows.
+All methods are applied to the real \texttt{survival::colon} dataset (929
+colon-cancer patients, two endpoints), rather than to synthetic data alone, and
+several implementation bugs in both public reference packages and our own
+from-scratch code were found and corrected along the way. The project was built as
+a demonstration piece to accompany a PhD application to VU Amsterdam on exactly
+this topic.
+\end{abstract}
+
+\tableofcontents
+
+% ==========================================================================
+\section{Motivation and Problem Statement}
+% ==========================================================================
+
+Standard survival analysis assumes that, given enough time, every subject in the
+study population will eventually experience the event of interest. \emph{Cure
+models} relax this by positing a latent split of the population into a
+\emph{susceptible} fraction, who will eventually experience the event, and a
+\emph{cured} (or immune) fraction, who never will. This structure is natural in
+oncology (a meaningful fraction of treated cancer patients never relapse) and in
+credit risk (a meaningful fraction of borrowers never default over the life of a
+loan).
+
+Estimating the cured fraction from data requires distinguishing, among subjects who
+have not yet had the event by the end of the study, those who never will from those
+who simply have not yet reached their (long) event time. This is only identifiable
+if the study's follow-up is long enough that essentially all susceptible subjects
+have already had the event by the end of observation: the \emph{sufficient
+follow-up} (SFU) assumption. When follow-up is insufficient, naive nonparametric
+estimators (e.g. Kaplan--Meier-based cure-rate estimates) are biased: they
+systematically \emph{overestimate} the cured fraction, because long-surviving
+susceptible subjects are counted as if cured.
+
+The applied problem this project addresses has two parts:
+\begin{enumerate}[nosep]
+    \item \textbf{Detection.} Given a dataset, is follow-up actually long enough to trust
+    a naive cure-rate estimate, overall and within covariate subgroups?
+    \item \textbf{Correction.} If not, can the tail behavior of the event-time
+    distribution be modeled well enough, using extreme value theory, to correct the
+    naive estimate, and does this correction remain usable as more covariates
+    are added?
+\end{enumerate}
+
+This project was built around four recent papers that address exactly these two
+questions from different angles, and applies all of them, end to end, to a single
+real dataset, rather than treating each paper as an isolated synthetic-data exercise.
+
+% ==========================================================================
+\section{Literature Anchors}
+% ==========================================================================
+
+Four papers anchor the project. All four were read in full and their key
+derivations were worked through by hand before any code was written.
+
+\begin{description}[leftmargin=1.2em, style=nextline]
+    \item[Yuen \& Musta (2024/2026)] \citep{yuenmusta2024} An unconditional
+    (marginal, no covariates) hypothesis test for sufficient follow-up, based on a
+    smoothed Grenander-type estimator of the boundary of the event-time
+    distribution's support. This is the baseline detection tool.
+
+    \item[Yuen, Musta \& Van Keilegom (2025)] \citep{yuenmustavankeilegom2025}
+    Extends the above test to categorical covariates. Proposes two complementary
+    procedures: \emph{Method 1}, an intersection-union test (IUT) that only
+    declares ``sufficient follow-up for all subgroups'' if every subgroup
+    individually clears significance; and \emph{Method 2}, a bootstrap procedure
+    that identifies which specific subgroup is most likely to have insufficient
+    follow-up.
+
+    \item[Xie, Escobar-Bach \& Van Keilegom (2023/2024)] \citep{xieebvk2023} A
+    sufficient-follow-up test in the Gumbel maximum-domain-of-attraction case, using
+    an Aitken-$\Delta^2$-style correction. Uses the opposite null-hypothesis
+    convention to Yuen \& Musta ($H_0$: sufficient, rather than $H_0$: insufficient),
+    which matters when combining results across papers.
+
+    \item[Escobar-Bach \& Van Keilegom (2019/2023)] \citep{ebvk2023} The
+    \emph{correction} paper, and the anchor for the extrapolation component of this
+    project. In the Fr\'echet maximum-domain-of-attraction (heavy-tailed) case, it
+    constructs a Beran-type conditional Kaplan--Meier estimator, then corrects its
+    tail using a Hill-type extreme-value index estimator $\hat\gamma(x)$ and an
+    extrapolated cure-probability estimator $\hat p(x)$, allowing the cure
+    probability to be estimated \emph{beyond} the observed follow-up horizon.
+\end{description}
+
+% ==========================================================================
+\section{Data}
+% ==========================================================================
+
+All methods are applied to \texttt{survival::colon}, a public dataset of 929
+patients from a colon cancer clinical trial, with two competing endpoints:
+\emph{recurrence} and \emph{death} (all-cause mortality). Covariates used across
+the project include age, sex, treatment arm, number of positive lymph nodes
+(\texttt{nodes}), tumor differentiation (\texttt{differ}), local extent of
+invasion (\texttt{extent}), and indicators for obstruction, perforation, and
+adherence to nearby organs.
+
+Real data, rather than synthetic data alone, was used deliberately throughout: the
+literature anchors mostly demonstrate their methods on synthetic examples or a
+single toy application, and part of the point of this project is to see whether
+the qualitative conclusions replicate, and where the methods break, on a genuine
+dataset with realistic covariate structure, censoring, and sample sizes.
+
+A key modeling choice is the cure/tail threshold $\tau$ (the point beyond which the
+distribution's tail behavior is extrapolated). For recurrence, $\tau$ was set to
+$\tau_G + 2$ years ($\approx 11.1$ years), justified by external clinical evidence:
+a large pooled analysis (Pastorino et al., 2025, \textit{JAMA Oncology}, $n=35{,}213$
+across 15 trials) shows colon-cancer recurrence risk falls below 0.5\% by six years
+post-surgery. For death (all-cause mortality), no such disease-specific cure horizon
+exists, so a more generous $\tau_G + 10$ years was used. This tau-sensitivity turned
+out to matter substantively: an earlier, more naive placeholder tau (1.5$\times$ the
+generic horizon) produced only a borderline recurrence result ($p \approx 0.06$–$0.08$),
+while the clinically justified tau produced a clearly significant one ($p=0.023$),
+illustrating that the choice of extrapolation horizon is not a nuisance parameter
+but a substantive, defensible modeling decision.
+
+% ==========================================================================
+\section{Phase 1: Baseline Replication of the Sufficient Follow-Up Tests}
+% ==========================================================================
+
+\subsection{Method}
+
+The unconditional and categorical sufficient-follow-up tests of
+\citet{yuenmusta2024} and \citet{yuenmustavankeilegom2025} were applied to both
+endpoints of the \texttt{colon} data, using the authors' own reference
+implementation, the \texttt{cureSFUTest} R package. Two categorical splits were
+tested: age (binned at the median) and sex.
+
+\subsection{Implementation issues found and fixed}
+
+Working with the real reference implementation surfaced concrete issues, all
+resolved and documented rather than worked around silently:
+
+\begin{itemize}[nosep]
+    \item \texttt{sfu.cov.test()} silently requires a numeric covariate matrix and
+    raises a misleading error message otherwise.
+    \item The package's own bootstrap loop reads \texttt{.Random.seed} without
+    checking it exists, which crashes on a fresh R session; fixed by explicitly
+    calling \texttt{set.seed()} beforehand. This is a genuine bug in the published
+    reference implementation, worth citing as such.
+    \item \texttt{sfu.test()}'s \texttt{method} argument silently resolves to
+    \texttt{"g"} (plain Grenander) rather than \texttt{"sg"} (smoothed Grenander)
+    if left at its default, which produces a degenerate $p=0$ on this data;
+    \texttt{method = "sg"} must be passed explicitly to obtain the
+    smoothed-Grenander test used throughout the rest of this report. (By
+    contrast, \texttt{sfu.cov.test()}, used for the categorical splits below,
+    always routes internally through the smoothed-Grenander bandwidth regardless
+    of arguments supplied, so it is not exposed to this particular default-argument
+    trap.)
+    \item The initial hand-written aggregation of \emph{Method 1} (the
+    intersection-union test) both (a) used the wrong, unconditional bandwidth
+    instead of the paper's undersmoothed conditional bandwidth, and (b) aggregated
+    per-subgroup $p$-values with $\min(p_x)$ rather than the correct
+    $\max(p_x)$ implied by the intersection-union logic ($H_0$: insufficient for
+    \emph{some} $x$; $H_1$: sufficient for \emph{all} $x$). Both were fixed --
+    the corrected implementation now reads Method 1's per-subgroup $p$-values
+    directly off the same \texttt{sfu.cov.test()} call already used for Method 2,
+    which internally always uses the correct undersmoothed bandwidth
+    ($bw = \min(\tau n^{-7/30},\, \tau/2)$). Getting the aggregation rule backwards
+    would have silently flipped the recurrence-by-sex conclusion, so this
+    correction mattered.
+\end{itemize}
+
+\subsection{Results}
+
+\begin{table}[h]
+\centering
+\caption{Unconditional sufficient-follow-up test results, by endpoint.}
+\begin{tabular}{lcc}
+\toprule
+Endpoint & $p$-value & Conclusion \\
+\midrule
+Recurrence & 0.023 & Sufficient follow-up \\
+Death (all-cause) & 0.66 & Insufficient follow-up \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Categorical (Method 1, corrected) sufficient-follow-up test, per-subgroup $p$-values.}
+\begin{tabular}{lcc}
+\toprule
+Split & Subgroup $p$-values & Method 1 ($\max p$) conclusion \\
+\midrule
+Recurrence $\times$ sex & female 0.001, male 0.108 & Not sufficient for \emph{all} (male not significant) \\
+Recurrence $\times$ age & 0.015, 0.043 & Sufficient for both age groups \\
+Death $\times$ sex & 0.328, 0.122 & Insufficient \\
+Death $\times$ age & 0.400, 0.138 & Insufficient \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The headline pattern is stable across every subgroup and survives the
+bandwidth/aggregation bug fix unchanged: recurrence follow-up is adequate, while
+death (all-cause mortality) follow-up is not. This makes sense clinically: colon-cancer
+recurrence has a genuine, relatively short biological horizon, whereas all-cause
+death has no such horizon within a finite trial follow-up window.
+
+The recurrence-by-sex split is the most interesting finding of this phase: female
+patients show clearly sufficient follow-up ($p=0.001$), while male
+patients are borderline and not statistically distinguishable from insufficient
+($p=0.108$). Age, by contrast, does not meaningfully split the recurrence
+conclusion. This is exactly the kind of covariate-dependent effect that a purely
+unconditional test would miss.
+
+A secondary finding, useful methodologically: \citet{yuenmustavankeilegom2025}'s
+own paper flags that Method 2's bootstrap-based worst-category selection can
+disagree with a naive largest-$p$-value ranking (``selection instability''). This
+was independently reproduced on the death-by-age and death-by-sex splits, across
+two separate runs.
+
+% ==========================================================================
+\section{Phase 2: Extrapolation Estimator and the Curse of Dimensionality}
+% ==========================================================================
+
+\subsection{Method}
+
+No existing R package implements the conditional, heavy-tailed correction
+estimator of \citet{ebvk2023}, so it was implemented from equations (2.6)--(2.8) of
+that paper. The base layer is a Beran (1981) kernel-weighted conditional
+Kaplan--Meier estimator (via \texttt{condSURV::Beran}, Epanechnikov kernel,
+bandwidth from \texttt{KernSmooth::dpik}). On top of this, a three-point ratio
+estimator gives the local tail index $\hat\gamma(x)$, and a two-point estimator
+gives the extrapolated cure probability $\hat p(x)$, using two geometrically-spaced
+tuning constants $(y_1, y_2)$ selected over a grid via the paper's ``quadratic
+errors criterion.'' This selection criterion was algebraically simplified to an
+equivalent, cheaper form: choosing the grid point whose $\hat p$ is closest to the
+mean of all grid $\hat p$ values, since
+$\arg\min_k \sum_j (P_k - P_j)^2 \Leftrightarrow \arg\min_k |P_k - \text{mean}(P)|$.
+
+\subsection{Validation and bugs found}
+
+The implementation was validated against synthetic data with known ground truth
+($\gamma(x)=(x{+}1)/2$, a logistic cure-probability function $p(x)$, Pareto-tailed
+uncured survival times, and an artificially short follow-up window to force a
+genuine insufficient-follow-up bias). The first run produced impossible values
+($\hat p > 1$), traced to a missing implementation detail: the source paper
+truncates $\hat\gamma(x)$ from below at 0.1 before it enters the $\hat p$ formula's
+$y_1^{-1/\gamma}$ term. After adding this truncation, the estimator recovered
+sensible values close to ground truth, and moved the naive Beran estimate in the
+theoretically correct direction (upward, since naive Beran always underestimates
+the true non-cure probability under insufficient follow-up).
+
+Applying the validated estimator to the real \texttt{colon} data surfaced a second,
+real-data-specific bug: on real data (a sparser effective local sample near the
+tail than the synthetic validation setup), $\hat\gamma(x)$ can swing very large
+(up to $\approx 40$ at age 75), which sends $\hat p(x)$ outside $[0,1]$ through the
+denominator $y_1^{-1/\gamma}-1$ approaching zero. This was fixed by restricting the
+tuning grid to candidates whose implied $\hat p$ falls in the theoretically required
+range $[F_n(\tau_n), 1]$ before applying the closest-to-mean selection rule.
+
+\subsection{Result: recurrence vs.\ death, and triangulation with Phase 1}
+
+Applied to real \texttt{colon} data (age covariate, 9-point grid over ages 35--75),
+the corrected estimator satisfies $\hat p(x) \geq$ naive Beran everywhere, as
+theory requires, and the correction is markedly larger for death (mean gap 0.078)
+than for recurrence (mean gap 0.038). This is a genuine triangulation: two
+independent methods (the Phase 1 hypothesis test and the Phase 2 extrapolation
+estimator) \emph{and} the source paper's own colon application all agree
+that recurrence follow-up is close to adequate while death follow-up is not.
+
+A sex-stratified check (splitting the same age-grid analysis by sex, to compare
+against the Phase 1 recurrence-by-sex finding) did \emph{not} replicate cleanly:
+the mean correction gap was larger for females (0.029) than males (0.021), the
+opposite direction from the Phase 1 SFU test, and per-age gaps were noisy (e.g.\
+one age point had no valid tuning pair at all). This is attributed to sample
+thinning: halving the sample per stratum shrinks the local effective sample size
+the Beran estimator sees near the tail, making the tail-index estimation
+noticeably noisier. This non-replication is reported honestly rather than forced
+into agreement with Phase 1; the pooled recurrence-vs-death result remains the
+stronger, cleanly-triangulated finding.
+
+\subsection{Curse-of-dimensionality demonstration}
+
+The core methodological question the vacancy for this project is built around,
+statistical learning for high-dimensional covariates with theoretical
+guarantees, motivated a concrete, mechanism-level demonstration of \emph{why}
+kernel-based conditional estimators like Beran's break down as covariates
+accumulate, rather than a single abstract assertion that the curse of
+dimensionality applies. The Beran estimator was extended to a multivariate
+product-Epanechnikov kernel, and real \texttt{colon} recurrence covariates were
+added one at a time (age, then $+$nodes, $+$differ, $+$extent), evaluated at the
+componentwise-median ``typical patient,'' with a \emph{fixed} per-dimension
+bandwidth (from \texttt{dpik}, or a Silverman-rule fallback for near-degenerate
+ordinal covariates) reused unchanged as dimensions were added. Holding
+bandwidths fixed as dimensions grow ensures that any degradation reflects
+dimensionality itself, not bandwidth retuning.
+
+\begin{table}[h]
+\centering
+\caption{Curse-of-dimensionality demonstration: effective sample size collapses as covariates accumulate.}
+\begin{tabular}{lcccc}
+\toprule
+Covariates & Kish ESS & naive $p$ & corrected $\hat p$ & $\hat\gamma$ \\
+\midrule
+age & 134.8 & 0.508 & 0.546 & 0.936 \\
+$+$ nodes & 36.6 & 0.359 & 0.395 & 1.214 \\
+$+$ differ & 29.4 & 0.362 & 0.418 & 1.241 \\
+$+$ extent & 18.4 & 0.495 & 0.496 & \textbf{0.100 (truncation floor)} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The effective sample size (Kish's ESS) collapses monotonically from 135 to 18 as
+four covariates are added with a fixed bandwidth. By four covariates, the
+tail-index estimator has visibly broken down: $\hat\gamma$ is pinned exactly at the
+0.1 truncation floor introduced during validation, a clean numerical signature of
+outright estimation failure rather than a gradual, still-informative decline.
+This is concrete, auditable evidence of the curse-of-dimensionality problem, not an
+assertion.
+
+A companion analysis multiplying dimensions differently (age, $+$nodes, $+$sex,
+$+$differ, evaluated on the death endpoint with $n=888$) reinforced this at a
+different evaluation point and additionally showed that the failure mode is not
+uniform across covariate space. Repeating the correction-gap analysis across five
+evaluation points (young/old age $\times$ low/high \texttt{nodes} profiles, plus
+the median patient) revealed that the clean ``gap shrinks monotonically with
+dimension'' story from a single median-point run does \emph{not} generalize: the
+mean correction gap trends down through three added covariates but ticks back up
+at the fourth, and $\hat\gamma$ floor-pinning is non-monotone across dimension.
+
+The real driver turned out to be \emph{local covariate-value rarity}, not raw
+dimension count: evaluation points with unusual \texttt{nodes} values (e.g.\
+nodes$=8$, versus a typical range of 1--5) collapse to an effective sample size of
+only 7--11 already at two covariates, and show $\hat\gamma$ bouncing erratically as
+further dimensions are added. Central, typical points (the median patient,
+low-nodes patients) stay comparatively stable (ESS 60--160) even at four
+covariates.
+
+A subsequent $B=150$ bootstrap check at three representative points (the median
+patient, a young/high-nodes patient, and an old/high-nodes patient), repeated
+across all four dimensions, confirmed this is a resampling-stable pattern rather
+than a single-sample artifact: for the typical/median patient, $\hat\gamma$
+floor-pinning rises from 5\% of bootstrap resamples at one covariate to
+63--69\% at three to four covariates, a systematic, dimensionality-driven
+collapse, while atypical high-nodes points are already unstable at a single
+covariate and simply stay noisy rather than worsening further, a small-sample
+fragility that dimensionality compounds rather than causes.
+
+This yields a sharper conclusion than a single blanket curse-of-dimensionality
+statement: there are \emph{two separable failure modes}: systematic, genuine
+dimensionality collapse for typical patients, and pre-existing small-sample
+fragility for atypical, rare covariate profiles that dimensionality merely
+compounds.
+
+\subsection{Comparison against a gradient-boosted alternative (gbex)}
+
+To test whether a modern high-dimensional tail-regression tool resolves either
+failure mode, \texttt{gbex} \citep{gbex2021} (a gradient-boosted generalized
+Pareto regression method, co-authored by one of this project's target
+supervisors) was installed from source (worked around a GitHub API rate limit by
+downloading the tarball directly via \url{codeload.github.com} rather than
+\texttt{remotes::in\-stall\_git\-hub}) along with its undeclared dependencies
+(\texttt{POT}, \texttt{treeClust}).
+
+Getting \texttt{gbex} to run correctly on this data required fixing several real
+usage bugs: the function signature does not accept a \texttt{status}/
+\texttt{threshold}/\texttt{maxit}/\texttt{stopcrit} interface (an initial
+implementation attempt assumed it did); \texttt{predict()} does not support
+\texttt{type="response"} and instead returns a data frame with columns \texttt{s}
+(scale) and \texttt{g} (shape); covariates must be passed as a proper data
+frame with real column names, not a bare matrix, or \texttt{predict.gbex} silently
+mismatches columns internally; and, encountered later when computing variable
+importance for the ten-covariate model below, \texttt{gbex::variable\_importance()}'s
+default \texttt{type} argument (\texttt{type = c("relative","permutation")}) is
+never resolved internally via \texttt{match.arg()}, so the default call errors
+with ``the condition has length > 1'' -- \texttt{type} must be passed explicitly.
+
+A more fundamental limitation was then found: \texttt{gbex} has no built-in notion
+of censoring, so it can only be fit on \emph{uncensored} exceedances above a
+threshold. Counting usable points across candidate thresholds showed this is
+severely limiting on this dataset: for recurrence (whose follow-up is already
+adequate per Phase 1, so there is little tail-exceedance signal left to model), the
+usable count drops from 32 points at the median threshold to just 1 at the 75th/90th
+percentile; for death, from 33 at the median threshold to 4 at the 90th percentile.
+Given this, the comparison was deliberately scoped down to the death endpoint at a
+low (50th-percentile) threshold, where 33 uncensored exceedances are available.
+
+On this constrained but usable setup, \texttt{gbex} produced a tail-index estimate
+$\hat\gamma \approx 0.005$ (near-exponential) that was essentially \emph{constant}
+across every evaluation point and every covariate dimension tested. Rather than
+accepting this as genuine stability, the flat result was investigated further. The
+root cause: with only 33 observations, \texttt{gbex}'s internal unconditional
+maximum-likelihood initial guess for $\gamma$ came back negative (nonsensical for a
+generalized Pareto tail), silently triggering a fixed default initialization
+($\gamma=0.01$); from that fixed starting point, the boosting shrinkage is tiny
+($\lambda \approx 0.007$), so the reported estimate barely moves regardless of the
+covariates supplied. A 30-repetition bootstrap confirmed the estimate is frozen
+under resampling too (SD $=0.00012$), i.e.\ the estimator is not responding to the
+data at all, not merely stable.
+
+This is an important negative finding, arguably more important than a
+clean positive result would have been: at this sample size, neither method
+reliably recovers patient-level tail heterogeneity, but the two methods fail in
+qualitatively different ways. The Beran-based estimator fails \emph{visibly} --
+explicit truncation-floor pinning is an auditable, detectable failure signature.
+\texttt{gbex} fails \emph{silently}: it produces what looks like a converged,
+stable estimate, but the stability is an artifact of a fallback initialization
+rather than genuine convergence. The silent failure mode is arguably the more
+practically dangerous one, since it could mislead a practitioner who does not
+inspect the initialization behavior.
+
+Separately, \texttt{gbex} was also applied to the recurrence endpoint using all ten
+available real covariates simultaneously (age, sex, obstruction, perforation,
+adherence, differentiation, extent, surgery type, nodes, and a nodes$\geq$4
+indicator) on 223 uncensored exceedances, explicitly as a demonstration of
+covariate-scaling for the \emph{scale} parameter alone, not a claim of solving the
+censoring/cure problem directly (this remains the open methodological gap the
+target PhD project is meant to address). Here \texttt{gbex} performed
+well: the estimated scale parameter varied substantially and meaningfully across
+patients (0.31--3.13), driven mainly by age, number of positive nodes,
+differentiation, and obstruction, and the full ten-covariate model outperformed an
+age-only model on deviance (1.221 vs.\ 1.280). The estimated shape (tail index),
+however, stayed pinned near zero for every patient regardless of covariates --
+consistent with the unconditional estimate, which was actually negative before
+\texttt{gbex}'s positivity constraint clamped it. This suggests that, among
+patients who do recur, the raw recurrence-time distribution shows little evidence
+of genuine heavy-tailedness; the insufficient-follow-up problem in this data more
+plausibly comes from the cure/mixture structure itself (a real never-recur
+subpopulation) than from a heavy-tailed susceptible population. This is a useful
+methodological point in its own right: it argues for the mixture-cure framing used
+throughout this project over a naive heavy-tail-only model, while also
+demonstrating \texttt{gbex}'s genuine value on the scale parameter specifically.
+
+% ==========================================================================
+\section{Phase 5: Simulation Study}
+% ==========================================================================
+
+Phase 5 was prioritized over the originally planned Phase 3 (a continuous-covariate
+sufficient-follow-up test) and the full Phase 4 (a comprehensive per-estimator
+uncertainty-quantification framework) because it reused already-validated code at
+low marginal cost and produced results with direct interpretive value. Phase 3 was
+explicitly scoped as a stretch or sketch item from the outset, and the full Phase 4
+was judged to be substantial, open-ended work relative to the remaining time before
+the application deadline.
+
+\subsection{Part A: Bias--variance tradeoff as follow-up length varies}
+
+Using the validated Phase 2 estimator on $N=2000$ synthetic patients (true
+$p(x_0=0.5) = 0.5987$), the censoring horizon $\tau_c$ was swept over
+$\{4, 6, 8, 12, 20, 40\}$, 30 replications per value.
+
+\begin{table}[h]
+\centering
+\caption{Bias and MSE of naive Beran vs.\ EBVK-corrected estimator as follow-up lengthens ($\tau_c$).}
+\begin{tabular}{lcccc}
+\toprule
+$\tau_c$ & Bias (naive) & Bias (corrected) & MSE (naive) & MSE (corrected) \\
+\midrule
+4 (severe) & $-0.095$ & $-0.038$ & 0.0119 & \textbf{0.0038} \\
+6 & $-0.038$ & $+0.018$ & 0.0044 & 0.0039 \\
+8 & $-0.031$ & $+0.012$ & 0.0042 & 0.0053 \\
+12 & $-0.024$ & $-0.003$ & 0.0027 & 0.0027 \\
+20 & $-0.002$ & $+0.009$ & 0.0015 & 0.0018 \\
+40 (near-sufficient) & $+0.003$ & $+0.011$ & 0.0022 & 0.0026 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This demonstrates the bias-variance tradeoff the correction is theoretically
+expected to exhibit, though the pattern is not perfectly monotonic. At severe
+insufficiency ($\tau_c=4$), the corrected estimator more than halves the bias and
+wins decisively on MSE (0.0038 vs.\ 0.0119), exactly where correcting matters
+most, and it still wins narrowly at $\tau_c=6$ (0.0039 vs.\ 0.0044). By $\tau_c=8$
+the correction's MSE advantage has already flipped (0.0053 vs.\ 0.0042), before
+the two estimators tie again at $\tau_c=12$ and naive Beran pulls ahead from
+$\tau_c=20$ onward. With only 30 replications per $\tau_c$, the dip at $\tau_c=8$
+is plausibly Monte Carlo noise rather than a genuine non-monotonicity, and it
+does not change the overall picture: as follow-up approaches sufficiency, naive
+Beran's own bias shrinks toward zero on its own, so the correction's advantage
+fades and eventually reverses, since the correction adds variance without a
+meaningful bias left to remove. This confirms, on a controlled synthetic sweep
+rather than a single point estimate, that the correction should be applied when
+follow-up is insufficient and can be safely skipped once it is close to
+adequate.
+
+\subsection{Part B: Method 1 vs.\ Method 2 as the number of covariate categories grows}
+
+Using the real \texttt{cureSFUTest} package, the number of covariate categories
+$K$ was swept over $2$--$5$, with a fixed total sample size $n=400$ split evenly
+across categories (so per-category $n$ shrinks with $K$: 200, 133, 100, 80).
+
+An initial pass mislabeled which simulated scenario corresponds to which error
+type; this was caught and corrected before reporting results below. In the
+``all categories sufficient'' scenario the ground truth is $H_1$, so \emph{failing}
+to detect it is a Type~II error, and the complement is the test's power to confirm
+true full sufficiency. In the ``one category insufficient'' scenario the ground
+truth is $H_0$, so wrongly declaring ``all sufficient'' is the actual Type~I error.
+
+\begin{table}[h]
+\centering
+\caption{Method 1 (intersection-union test) power and Type~I error, and Method 2 selection accuracy, as $K$ grows.}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+$K$ & $n$/category & Power (confirm true sufficiency) & Type I error (false ``all clear'') & Method 2 selection accuracy \\
+\midrule
+2 & 200 & 0.60 & 0.067 & 1.00 \\
+3 & 133 & 0.43 & 0.00 & 0.967 \\
+4 & 100 & 0.27 & 0.00 & 0.967 \\
+5 & 80 & 0.30 & 0.00 & 1.00 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+This produces a complementary-strengths finding. Method 1's Type~I error
+(falsely declaring ``sufficient follow-up for all subgroups'' when at least one
+subgroup truly is not) stays at or near zero across every $K$ tested, and if
+anything the test becomes \emph{more} conservative as $K$ grows: the
+intersection-union test essentially never gives false reassurance. This safety has
+a real cost, however: power to positively \emph{confirm} genuine full sufficiency
+collapses from 60\% at $K=2$ to roughly 27--30\% at $K \geq 4$, because every one of
+$K$ increasingly noisy, shrinking-sample-size, per-category tests must
+simultaneously clear the 5\% significance bar. Method 2's bootstrap-based
+diagnostic selection of \emph{which} category is problematic, by contrast, stays
+reliable (97--100\% accurate) throughout, regardless of $K$. The practical
+implication: Method 1 should be trusted for its conservatism (it will not falsely
+clear a real problem) but not relied upon to certify ``everything is fine'' once
+several covariate categories are involved; Method 2 remains the right tool for
+localizing where a problem is once one is suspected.
+
+% ==========================================================================
+\section{Discussion: What This Project Demonstrates}
+% ==========================================================================
+
+Across all five completed phases, three findings stand out as the strongest
+material for further development:
+
+\begin{enumerate}[nosep]
+    \item \textbf{Triangulated main finding (Phases 1 and 2).} Two independent
+    methods, a hypothesis test and an extrapolation estimator, and the original
+    source paper's own real-data application all agree: colon-cancer recurrence
+    follow-up in this dataset is close to sufficient, while all-cause death
+    follow-up is not. This agreement across independently implemented methods is
+    strong evidence that the qualitative conclusion is real, not an artifact of one
+    estimator.
+
+    \item \textbf{Mechanism-level curse-of-dimensionality evidence (Phase 2).} Rather
+    than asserting that kernel-based conditional cure estimators degrade with more
+    covariates, this project traces the exact numerical mechanism: effective sample
+    size collapse, and a clean truncation-floor signature marking the point of
+    estimator breakdown. It further separates this into two distinct failure
+    modes, systematic dimensionality collapse for typical patients, and
+    pre-existing small-sample fragility for atypical ones, and shows that a
+    modern gradient-boosted alternative (\texttt{gbex}) does not straightforwardly
+    solve the problem: at low sample sizes it fails \emph{silently}, via a fallback
+    initialization, which is arguably more dangerous in practice than the
+    Beran estimator's visible truncation-floor failure.
+
+    \item \textbf{Bias--variance tradeoff (Phase 5, Part A).} A controlled
+    synthetic sweep over follow-up length reproduces, with a full multi-point
+    curve rather than a single spot check, the theoretical bias--variance
+    tradeoff the correction method is designed to exhibit: large, decisive gains
+    when follow-up is severely insufficient, and a cost in variance once
+    follow-up is already close to adequate, with one likely-noise dip at
+    $\tau_c=8$ noted rather than smoothed over.
+\end{enumerate}
+
+An honest secondary finding worth naming explicitly is the sex-stratified
+non-replication in Phase 2 (Section 4.3): the Phase 1 hypothesis test and the
+Phase 2 extrapolation estimator disagree on the direction of the recurrence-by-sex
+effect once the sample is split by sex, most plausibly because of sample-size
+thinning rather than a genuine methodological contradiction. This is reported as
+an honest limitation rather than adjusted to agree with the headline result.
+
+Three concrete implementation bugs were found and corrected in the public
+\texttt{cureSFUTest} reference package (Section 4.2): the numeric-covariate-matrix
+requirement of \texttt{sfu.cov.test()}, the \texttt{.Random.seed} bootstrap crash,
+and \texttt{sfu.test()}'s silent default-argument fallback to the unsmoothed
+Grenander test. A further four usage bugs were found while fitting and evaluating
+\texttt{gbex} (Section 4.4): the assumed \texttt{status}/\texttt{threshold}/
+\texttt{maxit}/\texttt{stopcrit} interface, \texttt{predict()}'s unsupported
+\texttt{type="response"} argument, the data-frame-vs-matrix column-mangling issue,
+and \texttt{variable\_importance()}'s unresolved default \texttt{type} argument --
+alongside the separate, more consequential silent-initialization failure mode
+also documented in that section. Four more bugs were found and fixed in this
+project's own from-scratch code: a missing tail-index truncation, an
+out-of-range tuning-grid selection, an intersection-union aggregation-rule error,
+and an incorrect Type~I/II error labeling in simulation code. All are documented
+above rather than silently fixed, since correctly diagnosing and fixing
+implementation bugs in both published reference packages and one's own code is
+itself part of the applied statistical skill this project is meant to demonstrate.
+
+% ==========================================================================
+\section{Future Work}
+% ==========================================================================
+
+Two components of the original six-phase plan were deliberately deferred, and are
+named here as concrete open problems rather than treated as gaps in the current
+work.
+
+\paragraph{A continuous-covariate sufficient-follow-up test.} The categorical test
+of \citet{yuenmustavankeilegom2025} requires discretizing continuous covariates
+(as was done here for age) into bins, which discards information and makes the
+Phase 1 power problem (Section 6, Part B) worse as more categories are used. A
+natural extension combines Yuen \& Musta's smoothed-Grenander boundary estimator
+with the Beran-type conditional weighting used in Phase 2, replacing discrete
+subsampling by continuous covariate weighting. This does not require a full
+asymptotic theory to be useful as a first step: a working numerical version, paired
+with an honest statement of exactly which asymptotic argument (e.g.\ the limiting
+distribution of the smoothed-Grenander statistic under continuous local weighting)
+remains open, is itself a meaningful contribution and a natural bridge into
+doctoral-level theoretical work on this problem.
+
+\paragraph{Per-estimator uncertainty quantification, done correctly.} The tests
+used in Phases 1 and 5(B) come with their own bootstrap-based $p$-values, but the
+Phase 2 extrapolation estimator ($\hat p(x)$, $\hat\gamma(x)$) currently has no
+confidence intervals at all. A methodologically correct treatment requires
+different resampling schemes for different estimator types: a naive bootstrap is
+appropriate for smooth functionals (such as the Xie et al.\ and Escobar-Bach \&
+Van Keilegom estimators), while a smoothed bootstrap is required for the
+shape-constrained, Grenander-based tests, whose limiting distributions are
+non-standard. Building this properly, per estimator type, is substantial
+methodological work in its own right and is left as future work rather than
+attempted with a one-size-fits-all interval that would likely be invalid for at
+least one of the estimator types involved.
+
+\paragraph{Resolving the silent gbex failure mode.} The Phase 2 comparison
+surfaced a specific, fixable issue: \texttt{gbex}'s reliance on an unconditional
+MLE initial guess for the tail index becomes unreliable at small uncensored sample
+sizes, silently falling back to a fixed default. A natural methodological
+extension, and a direct answer to the vacancy's stated interest in
+high-dimensional covariates with theoretical guarantees, is to extend
+\texttt{gbex} or a similar gradient-boosted tail-regression framework to handle
+censoring natively (e.g.\ via a censored generalized Pareto likelihood), rather
+than restricting it to uncensored exceedances as done here. This would substantially
+increase the usable sample size for the recurrence endpoint in particular, where
+follow-up is already adequate and censored near-threshold observations currently
+carry no weight in the tail-regression step.
+
+% ==========================================================================
+\section*{Acknowledgments}
+% ==========================================================================
+This project was developed as a demonstration piece to accompany a PhD application
+to the Econometrics and Data Science Department, School of Business and Economics,
+VU Amsterdam, for the NWO-funded project \emph{``Seeing beyond the study duration:
+extreme value theory for long-term survival and cure chances,''} supervised by
+Dr.\ Juan Cai (VU Amsterdam) and Dr.\ Eni Musta (University of Amsterdam). All four
+anchor papers were selected specifically because they originate from the target
+supervisors' own research groups.
+
+% ==========================================================================
+\begin{thebibliography}{9}
+
+\bibitem[Yuen and Musta(2024)]{yuenmusta2024}
+Yuen, T.\ and Musta, E.\ (2024/2026).
+\textit{Testing for sufficient follow-up in survival data with a cure fraction.}
+Biometrical Journal. arXiv:2403.16832.
+
+\bibitem[Yuen et~al.(2025)]{yuenmustavankeilegom2025}
+Yuen, T., Musta, E.\ and Van Keilegom, I.\ (2025).
+\textit{Testing for sufficient follow-up in cure models with categorical covariates.}
+arXiv:2505.13128.
+
+\bibitem[Xie et~al.(2023)]{xieebvk2023}
+Xie, R., Escobar-Bach, M.\ and Van Keilegom, I.\ (2023/2024).
+\textit{Testing for sufficient follow-up in censored survival data by using extremes.}
+Biometrical Journal, 66(4):e202400033. arXiv:2309.00868.
+
+\bibitem[Escobar-Bach and Van Keilegom(2019)]{ebvk2023}
+Escobar-Bach, M.\ and Van Keilegom, I.\ (2019/2023).
+\textit{Nonparametric estimation of conditional cure models for heavy-tailed distributions and under insufficient follow-up.}
+Computational Statistics \& Data Analysis, 183:107728. arXiv:1909.08436.
+
+\bibitem[Velthoen et~al.(2021)]{gbex2021}
+Velthoen, J., Dombry, C., Cai, J.-J.\ and Engelke, S.\ (2021/2023).
+\textit{Gradient boosting for extreme quantile regression.}
+Extremes, 26(4):639--667. arXiv:2103.00808.
+
+\bibitem[Pastorino et~al.(2025)]{pastorino2025}
+Pastorino, A.\ et al.\ (2025).
+\textit{Timing and pattern of colon cancer recurrence: a pooled analysis of 15 adjuvant trials.}
+JAMA Oncology.
+
+\bibitem[Beran(1981)]{beran1981}
+Beran, R.\ (1981).
+\textit{Nonparametric regression with randomly censored survival data.}
+Technical Report, University of California, Berkeley.
+
+\end{thebibliography}
+
+\end{document}

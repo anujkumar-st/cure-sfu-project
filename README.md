@@ -100,19 +100,29 @@ above works for each of these too.
 
 ## Known upstream bugs (found and worked around, documented in the report)
 
+- `cureSFUTest::sfu.cov.test()` silently requires a numeric covariate
+  matrix and raises a misleading error message otherwise.
 - `cureSFUTest::sfu.test()`'s bootstrap loop reads `.Random.seed` without
   checking it exists, and crashes on a fresh R session -- call `set.seed()`
   first.
 - `cureSFUTest::sfu.test()`'s default `method` argument silently resolves
   to `"g"` (plain Grenander), which gives a degenerate p=0 on this data --
-  pass `method = "sg"` (smoothed Grenander) explicitly.
+  pass `method = "sg"` (smoothed Grenander) explicitly. `sfu.cov.test()`,
+  used for the categorical splits, always routes internally through the
+  smoothed-Grenander bandwidth regardless of arguments supplied, so it is
+  not exposed to this particular trap.
+- `gbex()` does not accept a `status`/`threshold`/`maxit`/`stopcrit`
+  interface -- it takes uncensored exceedances (`y`) and a covariate
+  data frame (`X`) directly.
+- `gbex::predict()` does not support `type="response"`; it returns a
+  data frame with columns `s` (scale) and `g` (shape) instead.
+- `gbex()`/`predict.gbex()` require `X`/`newdata` as a real `data.frame`
+  with real column names, not a bare matrix, or column names get mangled
+  internally (`X.x1` etc.) and silently mismatch.
 - `gbex::variable_importance()`'s default `type` argument
   (`type = c("relative","permutation")`) is never resolved with
   `match.arg()` internally, so the default call errors with "the
   condition has length > 1" -- pass `type` explicitly.
-- `gbex()`/`predict.gbex()` require `X`/`newdata` as a real `data.frame`
-  with real column names, not a bare matrix, or column names get mangled
-  internally (`X.x1` etc.) and silently mismatch.
 
 ## Reproducing Phase 1 at full precision
 
