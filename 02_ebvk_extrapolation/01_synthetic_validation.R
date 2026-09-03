@@ -1,5 +1,4 @@
-## Repository stage 02.1: synthetic sanity check of the from-scratch EBVK extrapolation
-## estimator against known ground truth (report Sec. 5.2).
+## Repository stage 02.1: synthetic sanity check of the from-scratch EBVK extrapolation estimator against known ground truth (report Sec. 5.2).
 
 source(if (file.exists("R/beran_ebvk.R")) "R/beran_ebvk.R" else "../R/beran_ebvk.R")
 if (!requireNamespace("KernSmooth", quietly = TRUE)) install.packages("KernSmooth")
@@ -19,14 +18,14 @@ simulate_one <- function(n, tau_c, eps_fixed_frac = 0.1) {
   gam_i <- gamma_fun(X); p_i <- p_fun(X)
   cured <- rbinom(n, 1, 1 - p_i) == 1
   U <- runif(n)
-  Y <- ifelse(cured, Inf, U^(-gam_i))   # Pareto-tailed uncured survival
+  Y <- ifelse(cured, Inf, U^(-gam_i))  
   C <- ifelse(runif(n) < 1 - eps_fixed_frac, runif(n, 0, tau_c), tau_c)
   Tobs <- pmin(Y, C)
   delta <- as.numeric(Y <= C)
   list(Tobs = Tobs, delta = delta, X = X)
 }
 
-## Single-run sanity check at x0 = 0.5
+
 x0 <- 0.5
 true_gamma <- gamma_fun(x0)
 true_p <- p_fun(x0)
@@ -43,7 +42,7 @@ cat(sprintf("EBVK corrected p_hat = %.4f (gamma_hat = %.4f)\n", fit$corrected, f
 cat(sprintf("Corrected moves toward truth: %s\n",
             abs(fit$corrected - true_p) < abs(fit$beran - true_p)))
 
-## Repeated-sample check: bias/MSE of naive vs corrected over R reps
+
 R <- 20
 reps <- t(sapply(seq_len(R), function(r) {
   d <- simulate_one(n, tau_c_short)
