@@ -1,4 +1,4 @@
-## Phase 2f: gbex comparison under matched conditions (report Sec. 5.5).
+## Repository stage 02.6: gbex comparison under matched conditions (report Sec. 5.5).
 ##
 ## gbex (Velthoen et al. 2021) has no notion of censoring, so it can only be fit on uncensored exceedances above a threshold. At the death
 ## endpoint's 50th-percentile threshold there are exactly 33 uncensored exceedances -- matched to the same evaluation points / covariate
@@ -13,7 +13,7 @@ if (!requireNamespace("gbex", quietly = TRUE)) {
 }
 suppressMessages({ library(survival); library(gbex) })
 
-data(colon)
+colon <- survival::colon
 death <- colon[colon$etype == 2, ]
 death <- death[complete.cases(death[, c("nodes", "differ")]), ]
 death$time_yr <- death$time / 365.25
@@ -22,7 +22,7 @@ u <- quantile(death$time_yr, 0.5)
 exc <- death[death$status == 1 & death$time_yr > u, ]
 cat(sprintf("Threshold u (50th pct) = %.3f years, n uncensored exceedances = %d\n",
             u, nrow(exc)))
-excess <- exc$time_yr - u  
+excess <- exc$time_yr - u
 
 med_sex <- median(death$sex); med_differ <- median(death$differ)
 points <- list(
@@ -35,7 +35,7 @@ combos <- list(c("age"), c("age", "nodes"), c("age", "nodes", "sex"),
                c("age", "nodes", "sex", "differ"))
 
 fit_gbex_at <- function(combo, x0) {
-  Xdf <- as.data.frame(exc[, combo, drop = FALSE])   
+  Xdf <- as.data.frame(exc[, combo, drop = FALSE])
   fit <- gbex(y = excess, X = Xdf, silent = TRUE)
   newdata <- as.data.frame(x0[combo])
   names(newdata) <- combo
@@ -84,8 +84,8 @@ cat(sprintf("mean=%.5f, sd=%.5f, range=[%.5f, %.5f] (n_valid=%d/%d)\n",
 cat("A tiny SD here indicates the estimate is FROZEN under resampling\n")
 cat("(an initialization artifact), not genuinely stable/converged.\n")
 
-out_dir <- if (dir.exists("phase2_extrapolation")) "phase2_extrapolation" else "."
+out_dir <- if (dir.exists("02_ebvk_extrapolation/results")) "02_ebvk_extrapolation/results" else "."
 saveRDS(list(results = results, uncond_gamma = uncond_fit$fitted.values["shape"],
              bootstrap = gam_boot),
-        file.path(out_dir, "phase2f_gbex_comparison_results.rds"))
-cat("\nSaved phase2f_gbex_comparison_results.rds\n")
+        file.path(out_dir, "06_gbex_comparison_results.rds"))
+cat("\nSaved 06_gbex_comparison_results.rds\n")

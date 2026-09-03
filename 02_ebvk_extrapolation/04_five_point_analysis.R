@@ -11,7 +11,7 @@ need <- c("survival", "KernSmooth")
 for (p in need) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
 suppressMessages({ library(survival); library(KernSmooth) })
 
-data(colon)
+colon <- survival::colon
 death <- colon[colon$etype == 2, ]
 death <- death[complete.cases(death[, c("nodes", "differ")]), ]  # n=888
 death$time_yr <- death$time / 365.25
@@ -21,8 +21,8 @@ cat(sprintf("n = %d\n", nrow(death)))
 
 silverman <- function(x) 1.06 * sd(x) * length(x)^(-1 / 5)
 hvec <- c(age    = dpik(death$age),
-          nodes  = silverman(death$nodes),   
-          sex    = 0.15,              
+          nodes  = silverman(death$nodes),
+          sex    = 0.15,
           differ = silverman(death$differ))
 cat("Fixed bandwidths:\n"); print(hvec)
 
@@ -72,6 +72,6 @@ print(tapply(results$gamma_hat, results$dim, function(g) sum(abs(g - GAMMA_FLOOR
 cat("\n=== ESS for the two rare/atypical high-nodes points ===\n")
 print(results[results$point %in% c("young_high_nodes", "old_high_nodes"), c("point", "dim", "ess")])
 
-out_dir <- if (dir.exists("phase2_extrapolation")) "phase2_extrapolation" else "."
-saveRDS(results, file.path(out_dir, "phase2d_five_point_results.rds"))
-cat("\nSaved phase2d_five_point_results.rds\n")
+out_dir <- if (dir.exists("02_ebvk_extrapolation/results")) "02_ebvk_extrapolation/results" else "."
+saveRDS(results, file.path(out_dir, "04_five_point_results.rds"))
+cat("\nSaved 04_five_point_results.rds\n")

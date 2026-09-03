@@ -8,7 +8,7 @@
 ##   - make_beran_md(): multivariate product kernel (Epanechnikov on continuous covariates, Aitchison-Aitken discount
 ##                      kernel on categorical/discrete covariates)
 
-## On top of either base layer, gamma_hat_fn()/p_hat_fn()/fit_at_x0() apply the EBVK tail-index and extrapolated-cure-probability correction.
+## On top of either base layer, gamma_hat_fn()/p_hat_fn()/fit_at_x0() apply the EBVK tail-index and tail extrapolation correction.
 
 ## Note on condSURV::Beran: the write-up (Sec. 5.1) describes the base layer as "via condSURV::Beran". condSURV pulls in a heavy, CRAN-only dependency
 ## chain (np, doParallel, doRNG, foreach) that isn't reachable from this sandboxed/offline environment. Beran's (1981) kernel-weighted KM estimator
@@ -60,7 +60,7 @@ make_beran_md <- function(T, delta, X, x0, h, categorical = character(0)) {
   }
   if (sum(w_raw) <= 0) stop("bandwidth too small: no observations in window")
   W <- w_raw / sum(w_raw)
-  ess <- 1 / sum(W^2)  
+  ess <- 1 / sum(W^2)
   ord <- order(T)
   Ts <- T[ord]; ds <- delta[ord]; Ws <- W[ord]
   cumWprev <- c(0, cumsum(Ws)[-length(Ws)])

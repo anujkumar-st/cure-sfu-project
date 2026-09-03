@@ -1,4 +1,4 @@
-## Phase 2a: synthetic sanity check of the from-scratch EBVK extrapolation
+## Repository stage 02.1: synthetic sanity check of the from-scratch EBVK extrapolation
 ## estimator against known ground truth (report Sec. 5.2).
 
 source(if (file.exists("R/beran_ebvk.R")) "R/beran_ebvk.R" else "../R/beran_ebvk.R")
@@ -33,7 +33,7 @@ true_p <- p_fun(x0)
 cat(sprintf("Ground truth at x0=%.1f: gamma=%.4f, p=%.4f\n", x0, true_gamma, true_p))
 
 n <- 2000
-tau_c_short <- 6 
+tau_c_short <- 6
 dat <- simulate_one(n, tau_c_short)
 h <- dpik(dat$X)
 fit <- fit_one(dat$Tobs, dat$delta, dat$X, x0, h)
@@ -61,7 +61,7 @@ cat(sprintf("  MSE naive=%.4f, MSE corrected=%.4f\n",
             mean((reps[, "beran"] - true_p)^2, na.rm = TRUE),
             mean((reps[, "corrected"] - true_p)^2, na.rm = TRUE)))
 
-out_dir <- if (dir.exists("phase2_extrapolation")) "phase2_extrapolation" else "."
+out_dir <- if (dir.exists("02_ebvk_extrapolation/results")) "02_ebvk_extrapolation/results" else "."
 saveRDS(list(single_run = fit, reps = reps, true_p = true_p, true_gamma = true_gamma),
-        file.path(out_dir, "phase2a_synthetic_validation_results.rds"))
-cat("\nSaved phase2a_synthetic_validation_results.rds\n")
+        file.path(out_dir, "01_synthetic_validation_results.rds"))
+cat("\nSaved 01_synthetic_validation_results.rds\n")

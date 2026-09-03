@@ -4,3 +4,5 @@
 *.Rproj
 .DS_Store
 Thumbs.db
+phase5B_standalone_outputs/
+phase5A_standalone_outputs/

@@ -1,4 +1,4 @@
-## Phase 2c: curse-of-dimensionality demonstration (report Sec. 5.4, Table 3).
+## Repository stage 02.3: curse-of-dimensionality demonstration (report Sec. 5.4, Table 3).
 
 ## Extends the Beran estimator to a multivariate product-Epanechnikov kernel and adds real colon-recurrence covariates one at a time
 ## (age, then +nodes, +differ, +extent), evaluated at the componentwise- median "typical patient", with a FIXED per-dimension bandwidth reused
@@ -9,9 +9,9 @@ need <- c("survival", "KernSmooth")
 for (p in need) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
 suppressMessages({ library(survival); library(KernSmooth) })
 
-data(colon)
+colon <- survival::colon
 rec <- colon[colon$etype == 1, ]
-rec <- rec[complete.cases(rec[, c("nodes", "differ")]), ]   
+rec <- rec[complete.cases(rec[, c("nodes", "differ")]), ]
 rec$time_yr <- rec$time / 365.25
 tau_n <- max(rec$time_yr)
 cat(sprintf("n = %d (dropped %d rows with NA nodes/differ)\n",
@@ -26,8 +26,8 @@ cat("Evaluation point (median patient):\n"); str(x0)
 silverman <- function(x) 1.06 * sd(x) * length(x)^(-1 / 5)
 h_age    <- dpik(rec$age)
 h_nodes  <- dpik(rec$nodes)
-h_differ <- silverman(rec$differ)   
-h_extent <- silverman(rec$extent)   
+h_differ <- silverman(rec$differ)
+h_extent <- silverman(rec$extent)
 hvec <- c(age = h_age, nodes = h_nodes, differ = h_differ, extent = h_extent)
 cat("\nFixed bandwidths:\n"); print(hvec)
 
@@ -49,6 +49,6 @@ print(table3, row.names = FALSE, digits = 4)
 cat(sprintf("\ngamma_hat hits the %.1f truncation floor at the final step: %s\n",
             GAMMA_FLOOR, isTRUE(all.equal(table3$gamma_hat[nrow(table3)], GAMMA_FLOOR))))
 
-out_dir <- if (dir.exists("phase2_extrapolation")) "phase2_extrapolation" else "."
-saveRDS(table3, file.path(out_dir, "phase2c_curse_of_dimensionality_results.rds"))
-cat("\nSaved phase2c_curse_of_dimensionality_results.rds\n")
+out_dir <- if (dir.exists("02_ebvk_extrapolation/results")) "02_ebvk_extrapolation/results" else "."
+saveRDS(table3, file.path(out_dir, "03_curse_of_dimensionality_results.rds"))
+cat("\nSaved 03_curse_of_dimensionality_results.rds\n")

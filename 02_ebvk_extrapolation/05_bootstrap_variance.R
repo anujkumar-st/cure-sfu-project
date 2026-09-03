@@ -1,4 +1,4 @@
-## Phase 2e: bootstrap variance check (report Sec. 5.4, final paragraph).
+## Repository stage 02.5: bootstrap variance check (report Sec. 5.4, final paragraph).
 ## B bootstrap resamples of gamma_hat/p_hat at 3 representative points (median patient, young/high-nodes, old/high-nodes) x 4 covariate
 ## dimensions (age, +nodes, +sex, +differ; death endpoint, n=888), to distinguish genuine dimensionality-driven instability (typical patient) from pre-existing small-sample fragility (atypical/rare covariate
 ## profiles) -- rather than trusting a single-sample point estimate.
@@ -9,7 +9,7 @@ need <- c("survival", "KernSmooth")
 for (p in need) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
 suppressMessages({ library(survival); library(KernSmooth) })
 
-data(colon)
+colon <- survival::colon
 death <- colon[colon$etype == 2, ]
 death <- death[complete.cases(death[, c("nodes", "differ")]), ]
 death$time_yr <- death$time / 365.25
@@ -73,6 +73,6 @@ print(results, row.names = FALSE, digits = 4)
 cat("\nFloor-pinning rate by point and dimension (fraction of B resamples):\n")
 print(tapply(results$floor_pin_rate, list(results$point, results$dim), identity))
 
-out_dir <- if (dir.exists("phase2_extrapolation")) "phase2_extrapolation" else "."
-saveRDS(results, file.path(out_dir, "phase2e_bootstrap_variance_results.rds"))
-cat("\nSaved phase2e_bootstrap_variance_results.rds\n")
+out_dir <- if (dir.exists("02_ebvk_extrapolation/results")) "02_ebvk_extrapolation/results" else "."
+saveRDS(results, file.path(out_dir, "05_bootstrap_variance_results.rds"))
+cat("\nSaved 05_bootstrap_variance_results.rds\n")

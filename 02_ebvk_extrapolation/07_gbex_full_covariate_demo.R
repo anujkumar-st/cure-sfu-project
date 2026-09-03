@@ -1,4 +1,4 @@
-## Phase 2g: gbex applied to the RECURRENCE endpoint with all ten available
+## Repository stage 02.7: gbex applied to the RECURRENCE endpoint with all ten available
 ## real covariates simultaneously (report Sec. 5.5, final two paragraphs).
 
 
@@ -9,7 +9,7 @@ if (!requireNamespace("gbex", quietly = TRUE)) {
 }
 suppressMessages({ library(survival); library(gbex) })
 
-data(colon)
+colon <- survival::colon
 rec <- colon[colon$etype == 1, ]
 rec$time_yr <- rec$time / 365.25
 covars <- c("age", "sex", "obstruct", "perfor", "adhere", "differ",
@@ -46,15 +46,15 @@ gp_negloglik <- function(y, sigma, gamma) {
 dev_full <- 2 * gp_negloglik(excess, pr_full$s, pr_full$g) / length(excess)
 dev_age  <- 2 * gp_negloglik(excess, pr_age$s,  pr_age$g)  / length(excess)
 cat(sprintf("\nMean deviance: age-only = %.3f, full 10-covariate = %.3f\n", dev_age, dev_full))
-cat(sprintf("Full model improves on age-only: %s\n", dev_full < dev_age))
+cat(sprintf("Full model has lower in-sample deviance than age-only: %s\n", dev_full < dev_age))
 
 
 cat("\n=== Variable importance (full model) ===\n")
 vi <- tryCatch(variable_importance(fit_full, type = "relative"), error = function(e) NULL)
 if (!is.null(vi)) print(vi)
 
-out_dir <- if (dir.exists("phase2_extrapolation")) "phase2_extrapolation" else "."
+out_dir <- if (dir.exists("02_ebvk_extrapolation/results")) "02_ebvk_extrapolation/results" else "."
 saveRDS(list(sigma_range = range(pr_full$s), gamma_range = range(pr_full$g),
              dev_full = dev_full, dev_age = dev_age, vi = vi, n = nrow(exc)),
-        file.path(out_dir, "phase2g_gbex_full_covariate_results.rds"))
-cat("\nSaved phase2g_gbex_full_covariate_results.rds\n")
+        file.path(out_dir, "07_gbex_full_covariate_results.rds"))
+cat("\nSaved 07_gbex_full_covariate_results.rds\n")

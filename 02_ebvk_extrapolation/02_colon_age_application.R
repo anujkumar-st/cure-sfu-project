@@ -1,4 +1,4 @@
-## Phase 2b: apply the validated EBVK extrapolation estimator to real
+## Repository stage 02.2: apply the EBVK extrapolation estimator to real
 ## survival::colon data, age as the (single) covariate, 9-point grid over
 ## ages 35-75.
 
@@ -7,7 +7,7 @@ need <- c("survival", "KernSmooth")
 for (p in need) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
 suppressMessages({ library(survival); library(KernSmooth) })
 
-data(colon)
+colon <- survival::colon
 rec   <- colon[colon$etype == 1, ]
 death <- colon[colon$etype == 2, ]
 rec$time_yr   <- rec$time   / 365.25
@@ -60,8 +60,8 @@ cat("(Report finding: this does NOT replicate Phase 1's direction -- female\n")
 cat(" gap was larger than male's, opposite of the Phase 1 SFU-test result;\n")
 cat(" attributed to sample thinning shrinking the local effective sample.)\n")
 
-out_dir <- if (dir.exists("phase2_extrapolation")) "phase2_extrapolation" else "."
+out_dir <- if (dir.exists("02_ebvk_extrapolation/results")) "02_ebvk_extrapolation/results" else "."
 saveRDS(list(rec_curve = rec_curve, death_curve = death_curve,
              male_curve = male_curve, female_curve = female_curve),
-        file.path(out_dir, "phase2b_colon_age_application_results.rds"))
-cat("\nSaved phase2b_colon_age_application_results.rds\n")
+        file.path(out_dir, "02_colon_age_application_results.rds"))
+cat("\nSaved 02_colon_age_application_results.rds\n")
