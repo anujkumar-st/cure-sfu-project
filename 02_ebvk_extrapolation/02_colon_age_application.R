@@ -1,6 +1,4 @@
-## Repository stage 02.2: apply the EBVK extrapolation estimator to real
-## survival::colon data, age as the (single) covariate, 9-point grid over
-## ages 35-75.
+## Repository stage 02.2: apply the EBVK extrapolation estimator to real survival::colon data, age as the (single) covariate, 9-point grid over ages 35-75.
 
 source(if (file.exists("R/beran_ebvk.R")) "R/beran_ebvk.R" else "../R/beran_ebvk.R")
 need <- c("survival", "KernSmooth")
@@ -42,7 +40,7 @@ cat(sprintf("Corrected >= naive everywhere (death):      %s\n",
             all(death_curve$gap >= -1e-8, na.rm = TRUE)))
 
 
-## Sex-stratified check against Phase 1's recurrence x sex finding
+
 cat("\n=== Sex-stratified recurrence age-grid (check against Phase 1) ===\n")
 rec_male   <- rec[rec$sex == 1, ]
 rec_female <- rec[rec$sex == 0, ]
