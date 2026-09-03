@@ -1,7 +1,5 @@
-## Repository stage 02.6: gbex comparison under matched conditions (report Sec. 5.5).
-##
 ## gbex (Velthoen et al. 2021) has no notion of censoring, so it can only be fit on uncensored exceedances above a threshold. At the death
-## endpoint's 50th-percentile threshold there are exactly 33 uncensored exceedances -- matched to the same evaluation points / covariate
+## endpoint's 50th-percentile threshold, there are exactly 33 uncensored exceedances, matched to the same evaluation points/covariate
 ## dimensions (d1-d4: age, +nodes, +sex, +differ) used for the Beran comparison in Phase 2d, to test whether gbex resolves the
 ## dimensionality-driven failure mode found there.
 
