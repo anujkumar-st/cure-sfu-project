@@ -1,9 +1,6 @@
-## Phase 2d: companion curse-of-dimensionality analysis on the DEATH
-## endpoint (report Sec. 5.4, paragraph after Table 3), with a different
-## covariate order (age, +nodes, +sex, +differ) and checked across FIVE
-## evaluation points instead of just the median patient, to test whether
-## the single-point "gap shrinks monotonically with dimension" story
-## generalizes.
+## Phase 2d: companion curse-of-dimensionality analysis on the DEATH endpoint (report Sec. 5.4, paragraph after Table 3), with a different
+## covariate order (age, +nodes, +sex, +differ) and checked across FIVE evaluation points instead of just the median patient, to test whether
+## the single-point "gap shrinks monotonically with dimension" story generalizes.
 
 
 source(if (file.exists("R/beran_ebvk.R")) "R/beran_ebvk.R" else "../R/beran_ebvk.R")
@@ -13,7 +10,7 @@ suppressMessages({ library(survival); library(KernSmooth) })
 
 colon <- survival::colon
 death <- colon[colon$etype == 2, ]
-death <- death[complete.cases(death[, c("nodes", "differ")]), ]  # n=888
+death <- death[complete.cases(death[, c("nodes", "differ")]), ]  
 death$time_yr <- death$time / 365.25
 tau_n <- max(death$time_yr)
 cat(sprintf("n = %d\n", nrow(death)))
