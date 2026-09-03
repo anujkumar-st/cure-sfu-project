@@ -1,5 +1,4 @@
-## Repository stage 02.7: gbex applied to the RECURRENCE endpoint with all ten available
-## real covariates simultaneously (report Sec. 5.5, final two paragraphs).
+## gbex applied to the RECURRENCE endpoint with all ten available real covariates simultaneously (report Sec. 5.5, final two paragraphs).
 
 
 need <- c("survival")
