@@ -46,9 +46,7 @@ this topic.
 
 \tableofcontents
 
-% ==========================================================================
 \section{Motivation and Problem Statement}
-% ==========================================================================
 
 Standard survival analysis assumes that, given enough time, every subject in the
 study population will eventually experience the event of interest. \emph{Cure
@@ -83,9 +81,9 @@ This project was built around four recent papers that address exactly these two
 questions from different angles, and applies all of them, end to end, to a single
 real dataset, rather than treating each paper as an isolated synthetic-data exercise.
 
-% ==========================================================================
+
 \section{Literature Anchors}
-% ==========================================================================
+
 
 Four papers anchor the project. All four were read in full and their key
 derivations were worked through by hand before any code was written.
@@ -120,9 +118,8 @@ derivations were worked through by hand before any code was written.
     follow-up horizon.
 \end{description}
 
-% ==========================================================================
+
 \section{Data}
-% ==========================================================================
 
 All methods are applied to \texttt{survival::colon}, a public dataset of 929
 patients from a colon cancer clinical trial, with two competing endpoints:
@@ -153,9 +150,8 @@ illustrating that the choice of Phase 1 study horizon is not a nuisance paramete
 but a substantive, defensible modeling decision. For Phase 2, the EBVK estimator instead
 uses the paper's $\tau_n=\max_i T_i$ endpoint at each fitted covariate value.
 
-% ==========================================================================
+
 \section{Phase 1: Baseline Replication of the Sufficient Follow-Up Tests}
-% ==========================================================================
 
 \subsection{Method}
 
@@ -247,9 +243,8 @@ $x_{\ast}=2$ for sex and $x_{\ast}=1$ for age. This run therefore does not provi
 evidence of bootstrap-driven selection instability, although the package paper notes
 that such disagreement can occur in general.
 
-% ==========================================================================
+
 \section{Phase 2: Extrapolation Estimator and the Curse of Dimensionality}
-% ==========================================================================
 
 \subsection{Method}
 
@@ -456,9 +451,7 @@ methodological point in its own right: it argues for the mixture-cure framing us
 throughout this project over a naive heavy-tail-only model, while also
 demonstrating \texttt{gbex}'s genuine value on the scale parameter specifically.
 
-% ==========================================================================
 \section{Phase 5: Simulation Study}
-% ==========================================================================
 
 Phase 5 was prioritized over the originally planned Phase 3 (a continuous-covariate
 sufficient-follow-up test) and the full Phase 4 (a comprehensive per-estimator
@@ -545,9 +538,8 @@ With only 30 outer replications, these are empirical study results rather than
 precise estimates of the underlying error probabilities; a larger Monte Carlo run
 can be used later for tighter precision.
 
-% ==========================================================================
+
 \section{Discussion: What This Project Demonstrates}
-% ==========================================================================
 
 Across the completed analytical phases, three findings stand out as the strongest
 material for further development:
@@ -604,9 +596,8 @@ above rather than silently fixed, since correctly diagnosing and fixing
 implementation bugs in both published reference packages and one's own code is
 itself part of the applied statistical skill this project is meant to demonstrate.
 
-% ==========================================================================
+
 \section{Future Work}
-% ==========================================================================
 
 Two components of the original six-phase plan were deliberately deferred, and are
 named here as concrete open problems rather than treated as gaps in the current
@@ -651,7 +642,7 @@ increase the usable sample size for the recurrence endpoint in particular, where
 follow-up is already adequate and censored near-threshold observations currently
 carry no weight in the tail-regression step.
 
-% ==========================================================================
+
 \begin{thebibliography}{9}
 
 \bibitem[Yuen and Musta(2024)]{yuenmusta2024}
