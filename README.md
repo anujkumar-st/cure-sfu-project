@@ -2,8 +2,7 @@
 
 Code accompanying *"Testing and Correcting for Insufficient Follow-Up in
 Covariate-Dependent Cure Models: From Categorical Tests to a Heavy-Tailed
-Extrapolation, and Back"* (Anuj Kumar, Aug 2026) -- a demonstration project
-built to accompany a PhD application to VU Amsterdam. The full write-up is
+Extrapolation, and Back"* (Anuj Kumar, Aug 2026). The full write-up is
 in [`report/vu_project.pdf`](report/vu_project.pdf).
 
 ## Project status
