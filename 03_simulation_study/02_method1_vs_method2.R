@@ -1,6 +1,3 @@
-## ============================================================================
-## STANDALONE PHASE 5B — parallel replication of the PROJECT-2 Part B design
-##
 ## Uses purrr + furrr and can be run from ANY working directory.
 ##
 ## IMPORTANT HYPOTHESES / INTERPRETATION
@@ -20,12 +17,10 @@
 ##   one_insufficient scenario:
 ##       H0 is true -> rejection of H0 = false "all clear" = TYPE-I ERROR
 ##
-## This mirrors the interpretation in the Project 2 report.
-## ============================================================================
+## This mirrors the interpretation in the Project report.
+
 
 options(stringsAsFactors = FALSE)
-
-## ----------------------------- packages -------------------------------------
 
 required <- c("survival", "purrr", "furrr", "future")
 
@@ -50,7 +45,7 @@ suppressMessages({
   library(future)
 })
 
-## ----------------------------- model ----------------------------------------
+
 
 simulate_categorical <- function(K, n_total, hard_tau_c, easy_tau_c,
                                   all_sufficient = FALSE) {
@@ -111,7 +106,6 @@ simulate_categorical <- function(K, n_total, hard_tau_c, easy_tau_c,
   )
 }
 
-## ----------------------------- settings -------------------------------------
 
 N_REPS_B <- 30
 N_BOOT_B <- 200
@@ -128,7 +122,6 @@ GAMMA <- 0.9
 
 Q_99 <- (1 / EPS)^GAMMA
 
-## Keep all but one logical core for the OS.
 N_WORKERS <- max(
   1L,
   future::availableCores() - 1L
@@ -188,7 +181,6 @@ cat(sprintf(
   N_WORKERS
 ))
 
-## ----------------------------- one task -------------------------------------
 
 run_one_task <- function(K, scenario, rep) {
 
@@ -197,9 +189,6 @@ run_one_task <- function(K, scenario, rep) {
     "all_sufficient"
   )
 
-  ## These are EXACTLY the deterministic seeds used by the sequential
-  ## Project 2 Phase 5B script. This makes the parallel implementation
-  ## comparable to the original design.
   set.seed(
     1000 * K +
       rep +
@@ -214,8 +203,7 @@ run_one_task <- function(K, scenario, rep) {
     all_sufficient = all_sufficient
   )
 
-  ## Use X exactly as in the project reference script.
-  ## cureSFUTest checks that X is numeric.
+ 
   fit <- tryCatch(
     cureSFUTest::sfu.cov.test(
       dat$Tobs,
@@ -242,9 +230,7 @@ run_one_task <- function(K, scenario, rep) {
     )
   }
 
-  ## IUT aggregation:
-  ## max subgroup p-value < alpha means ALL subgroup tests reject H0,
-  ## hence the global H0 ("insufficient for some category") is rejected.
+ ## max subgroup p-value < alpha means ALL subgroup tests reject H0, hence the global H0 ("insufficient for some category") is rejected.
   agg_p <- max(
     as.numeric(fit$p.value),
     na.rm = TRUE
@@ -252,8 +238,7 @@ run_one_task <- function(K, scenario, rep) {
 
   method1_reject <- agg_p < 0.05
 
-  ## Method 2 is meaningful in the one-insufficient scenario:
-  ## category 1 is the known worst category.
+  ## Method 2 is meaningful in the one-insufficient scenario: category 1 is the known worst category.
   method2_correct <- NA_real_
 
   if (!all_sufficient) {
@@ -279,8 +264,6 @@ run_one_task <- function(K, scenario, rep) {
   )
 }
 
-## ----------------------------- task grid ------------------------------------
-
 task_grid <- expand.grid(
   K = K_GRID,
   scenario = c(
@@ -296,8 +279,6 @@ cat(sprintf(
   "Total tasks: %d\n\n",
   nrow(task_grid)
 ))
-
-## ----------------------------- parallel execution --------------------------
 
 t0 <- Sys.time()
 
@@ -323,7 +304,6 @@ cat(sprintf(
   as.numeric(elapsed, units = "mins")
 ))
 
-## ----------------------------- summary --------------------------------------
 
 partB_results <- do.call(
   rbind,
@@ -352,19 +332,19 @@ partB_results <- do.call(
           N_TOTAL_B / K
         ),
 
-        ## H1 true -> rejection = POWER
+        
         method1_power = mean(
           scen_all_sufficient$method1_reject,
           na.rm = TRUE
         ),
 
-        ## H0 true -> rejection = TYPE-I ERROR
+       
         method1_type1_error = mean(
           scen_one_insufficient$method1_reject,
           na.rm = TRUE
         ),
 
-        ## True worst category is x=1
+       
         method2_selection_accuracy = mean(
           scen_one_insufficient$method2_correct,
           na.rm = TRUE
@@ -393,8 +373,6 @@ print(
   row.names = FALSE
 )
 
-## ----------------------------- interpretation -------------------------------
-
 cat("\n============================================================\n")
 cat("INTERPRETATION\n")
 cat("============================================================\n\n")
@@ -415,7 +393,6 @@ cat(
   "as the true insufficient-follow-up category.\n\n"
 )
 
-## ----------------------------- output ---------------------------------------
 
 OUTPUT_DIR <- if (dir.exists("03_simulation_study/results")) {
   "03_simulation_study/results"
@@ -471,8 +448,6 @@ saveRDS(
     "partB_results.rds"
   )
 )
-
-## Plot:
 ##   Type-I error should remain around/below nominal 0.05.
 ##   Power is confirmatory power under the all-sufficient scenario.
 ##   Method 2 accuracy is localization accuracy under one-insufficient.
@@ -528,7 +503,6 @@ legend(
 
 dev.off()
 
-## Restore sequential execution.
 plan(sequential)
 
 cat("\nSaved outputs to:\n")
