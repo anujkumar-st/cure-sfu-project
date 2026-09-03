@@ -1,4 +1,3 @@
-## Repository stage 03 simulation study: Part A
 ## Bias/MSE versus censoring horizon for the from-scratch EBVK estimator.
 
 source("R/beran_ebvk.R")
