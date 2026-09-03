@@ -1,8 +1,6 @@
-## Repository stage 02.3: curse-of-dimensionality demonstration (report Sec. 5.4, Table 3).
-
 ## Extends the Beran estimator to a multivariate product-Epanechnikov kernel and adds real colon-recurrence covariates one at a time
 ## (age, then +nodes, +differ, +extent), evaluated at the componentwise- median "typical patient", with a FIXED per-dimension bandwidth reused
-## unchanged as dimensions are added -- so degradation reflects dimensionality alone, not bandwidth retuning.
+## unchanged as dimensions are added, so degradation reflects dimensionality alone, not bandwidth retuning.
 
 source(if (file.exists("R/beran_ebvk.R")) "R/beran_ebvk.R" else "../R/beran_ebvk.R")
 need <- c("survival", "KernSmooth")
