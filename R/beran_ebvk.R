@@ -1,7 +1,7 @@
 ## beran_ebvk.R
 ##
 ## Shared core functions for the Escobar-Bach & Van Keilegom (2019/2023)
-## conditional cure / heavy-tail extrapolation estimator, implemented from their eqs. (2.6)-(2.8). Used by every Phase 2 script.
+## Conditional cure / heavy-tail extrapolation estimator, implemented from their equations. (2.6)-(2.8). Used by every Phase 2 script.
 ##
 ## Two versions of the base conditional-KM layer are provided:
 ##   - make_beran():    single continuous covariate, Epanechnikov kernel
