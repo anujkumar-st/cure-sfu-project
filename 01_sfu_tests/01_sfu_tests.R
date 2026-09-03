@@ -1,7 +1,5 @@
-## ============================================================================
 ## Repository stage 01: baseline replication of the sufficient-follow-up (SFU) tests
 ## on survival::colon, using the real reference package cureSFUTest.
-## ============================================================================
 
 options(stringsAsFactors = FALSE)
 
@@ -42,9 +40,7 @@ cat(sprintf("tau_G = %.6f years\n", tau_G))
 cat(sprintf("tau_rec = %.6f years; tau_death = %.6f years\n", tau_rec, tau_death))
 cat(sprintf("Events: recurrence=%d, death=%d\n\n", sum(rec$event), sum(death$event)))
 
-## ---------------------------------------------------------------------------
 ## Table 1: unconditional tests
-## ---------------------------------------------------------------------------
 
 fit_rec <- sfu.test(rec$time_yr, rec$event, tau = tau_rec, method = "sg")
 fit_death <- sfu.test(death$time_yr, death$event, tau = tau_death, method = "sg")
@@ -62,9 +58,8 @@ tbl1 <- data.frame(
 cat("=== Table 1 ===\n")
 print(tbl1, row.names = FALSE)
 
-## ---------------------------------------------------------------------------
 ## Table 2: categorical tests
-## ---------------------------------------------------------------------------
+
 
 rec$age_bin <- as.numeric(rec$age > median(rec$age, na.rm = TRUE))
 death$age_bin <- as.numeric(death$age > median(death$age, na.rm = TRUE))
@@ -129,9 +124,8 @@ tbl2 <- data.frame(
 cat("\n=== Table 2 ===\n")
 print(tbl2, row.names = FALSE)
 
-## ---------------------------------------------------------------------------
+
 ## Method 2 repeatability check (descriptive; not a claim of instability)
-## ---------------------------------------------------------------------------
 
 set.seed(2026)
 death_sex_r2 <- run_categorical(death, "sex", tau_death)
@@ -146,9 +140,6 @@ method2_repeat <- data.frame(
 cat("\n=== Method 2 repeatability check ===\n")
 print(method2_repeat, row.names = FALSE)
 
-## ---------------------------------------------------------------------------
-## Save complete verified results
-## ---------------------------------------------------------------------------
 
 phase1_results <- list(
   tau_G = tau_G,
